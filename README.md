@@ -1,5 +1,5 @@
 # EvLG2022
-Python and R code scripts utilized for landscape genomics analyses in Stunz et al., 2022
+R code scripts utilized for genotype-environment association and landscape genomics analyses in Stunz et al., 2022
 
 Hello!
 
