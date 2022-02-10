@@ -1,5 +1,5 @@
 # EvLG2022
-R code and Python scripts utilized for data filtering and genotype-environment association and landscape genomics analyses in Stunz et al., 2022
+R code and Python scripts for running the Stacks pipeline and genotype-environment association and landscape genomics analyses in Stunz et al., 2022
 
 Hello!
 
