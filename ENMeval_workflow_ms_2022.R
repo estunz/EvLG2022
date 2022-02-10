@@ -7,15 +7,18 @@ library(ENMeval) #Need ENMeval version >= 2.0
 library(raster)
 library(dplyr)
 
+# Set a random seed in order to be able to reproduce this analysis.
+set.seed(48)
+
 ####### USAGE #############
-occ <- read.csv("occurrence_coordinates.csv")
+occs <- read.csv("occurrence_coordinates.csv")
 
 # Removing occurrences to avoid pseudoreplication.
-occ <- occ[!duplicated(occ),]
+occs <- occs[!duplicated(occs),]
 
 #AICc (Akaike Information Criterion for small sample size) to compare models
 
-#USE CLIPPED WORLDCLIM BIOVARIABLES RASTERS, (600mb is too large for a single raster .asc file)
+#USE CLIPPED WORLDCLIM BIOVARIABLES RASTERS, (600 MB is too large for a single raster .asc file)
 r1 <- raster("bio_01_clip.asc")
 r2 <- raster("bio_02_clip.asc")
 r3 <- raster("bio_03_clip.asc")
@@ -37,8 +40,8 @@ r18 <- raster("bio_18_clip.asc")
 r19 <- raster("bio_19_clip.asc")
 env <- stack(r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,r18,r19)
 
-#use maxent.jar algorithm to get variable contribution to model stats
-enmeval <- ENMevaluate(occ, env, bg.coords = NULL, occ.grp = NULL, 
+#use maxent.jar algorithm to get variable contribution to model statistics
+enmeval <- ENMevaluate(occs, env, bg.coords = NULL, occ.grp = NULL, 
             bg.grp = NULL, RMvalues = c(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4), 
             fc = c("L", "LQ", "LQP", "H", "T", "LQH", "LQHP", "LQHPT"),
             categoricals = NULL, n.bg = 20000, method = "block", 
@@ -49,7 +52,23 @@ enmeval <- ENMevaluate(occ, env, bg.coords = NULL, occ.grp = NULL,
 
 saveRDS(enmeval, "enmeval.RDS")
 
-#####COMMAND-LINE R TO CREATE CSV OF WORLDCLIM VARIABLE VALUES FOR ALL EV OCCURRENCES AND IDENTIFY CORRELATED PREDICTORS ########:
+
+#################Exploring ENMeval results ###################################
+library(tidyverse)
+
+enmeval <- readRDS("enmeval.RDS")
+enmeval
+str(enmeval, max.level=2)
+eval.results(enmeval) %>% head()
+eval.bg(enmeval) %>% head()
+eval.occs.grp(enmeval) %>% str()
+
+#Write .csvs of results and variable.importance for enmeval object
+write.csv(enmeval@results, file = "enmeval_v2_results.csv")
+#enmeval@variable.importance
+write.csv(enmeval@variable.importance, file = "enmeval_v2_results_var_import.csv")
+
+#####CREATE CSV OF WORLDCLIM VARIABLE VALUES FOR ALL OCCURRENCES AND CREATE VARIABLE SUBSET########:
 library(sf)
 #env #raster stack
 evpres <- st_read("ev_pres_AK_layers/POINT.shp") #Worldclim shapefile
@@ -63,36 +82,55 @@ env_csv <- read.csv("ev_pres_AK_wc_all_occs_08262021.csv")
 rs <- corr.test(env_csv[,1:])
 rs
 
-#Use ENMTools to examine variable collinearity and then re-run ENMeval with subset of variables
+#Examine variable collinearity and re-run ENMeval with subset of variables: variables contributing most to 
+  #model are retained and highly correlated variables are removed 
 library (ENMTools)
 raster.cor.matrix(env, method = "pearson")
 
+#### Visualizing tuning results #####################
 
-#################Exploring ENMeval results ###################################
-library(dismo)
-library(sp)
-library(tidyverse)
+#to plot more than one statistic at once with ggplot facetting:
+evalplot.stats(e = enmeval, stats = c("or.mtp", "auc.val"), color = "fc", x.var = "rm")
+#to jitter the positions of overlapping points:
+evalplot.stats(e = enmeval, stats = c("or.mtp", "auc.val"), color = "fc", x.var = "rm", 
+               dodge = 0.5)
+#to switch which variables are on the x-axis and which are symbolized by color.
+# (ENMeval only accepts two variables for plotting)
+evalplot.stats(e = enmeval, stats = c("or.mtp", "auc.val"), color = "rm", x.var = "fc", 
+               error.bars = FALSE)
 
-enmeval <- readRDS("enmeval.RDS")
-enmeval
-str(enmeval, max.level=2)
+########## Model selection and overall results ##############
+res <- eval.results(enmeval)
+# Select the model with delta AICc equal to 0, or the one with the lowest AICc score.
+opt.aicc <- res %>% filter(delta.AICc == 0)
+opt.aicc
 
-enmeval@algorithm
-enmeval@models
-enmeval@partition.method
-enmeval@results %>% head()
-enmeval@models %>% str(max.level = 1)
-enmeval@results
-write.csv(enmeval@results, file = "enmeval_results.csv")
+#cross-validation sequential method to select models with the lowest average test omission rate, and if needed, 
+#to break ties using highest average validation AUC (Radosavljevic & Anderson 2014, Kass et al. 2020).
+opt.seq <- res %>% 
+  filter(or.10p.avg == min(or.10p.avg)) %>% 
+  filter(auc.val.avg == max(auc.val.avg))
+opt.seq
 
-#investigate AICc, AUC_test and orMTP to evaluate model performance
-eval.plot(enmeval@results, value = "delta.AICc", variance = NULL, legend = TRUE,
-          legend.position = "topright")
-eval.plot(enmeval@results, value = "AICc", variance = NULL, legend = TRUE,
-          legend.position = "topright")
-eval.plot(enmeval@results, value = "avg.test.AUC", variance = NULL, legend = TRUE,
-          legend.position = "topright")
-eval.plot(enmeval@results, value = "avg.diff.AUC", variance = NULL, legend = TRUE,
-          legend.position = "topright")
-eval.plot(enmeval@results, value = "avg.test.orMTP", variance = NULL, legend = TRUE,
-          legend.position = "topright")
+# Select the model predictions for our optimal model (based on preferred method) and plot 
+pred.seq <- eval.predictions(enmeval)[[opt.aicc$tune.args]]
+plot(pred.seq)
+
+#plot the binned background points below occurrence points on top to 
+# visualize locations of training data
+points(eval.bg(enmeval), pch = 3, col = eval.bg.grp(enmeval), cex = 0.5)
+points(eval.occs(enmeval), pch = 21, col = "white", bg = eval.occs.grp(enmeval))
+
+
+########## METADATA ###############################
+#create a rangeModelMetadata object (described by Merow et al. (2019)) to describe standards of metadata and ENM rating systems
+rmm <- eval.rmm(enmeval)
+#describe model selection approach
+rmm$model$selectionRules <- "lowest delta AICc"
+#define optimal model settings
+rmm$model$finalModelSettings <- "rm.0.5_fc.LQHPT"
+rmm$prediction$continuous$minVal <- cellStats(pred.seq, min)
+rmm$prediction$continuous$maxVal <- cellStats(pred.seq, max)
+rmm$prediction$continuous$units <- "suitability (cloglog transformation)"
+#save the metadata to a CSV file
+rangeModelMetadata::rmmToCSV(rmm, "rmm_evlg2022.csv")
