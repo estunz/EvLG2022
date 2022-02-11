@@ -48,4 +48,4 @@ os.system("gstacks -P ./stacks -M popmap_2019_no_GB_HP -t 10")
 
 #Executes populations program exporting statistics in different formats and move them to output directory#
 #-r 0.80 for parameter optimization based on Paris et al., 2017
-os.system("populations -P ./stacks --popmap popmap_2019_no_GB_HP -t 10 -p 17 -r 0.80") 
+os.system("populations -P ./stacks --popmap popmap_2019_no_GB_HP -p 17 -r 0.8 -t 10 --min-maf 0.01 --genepop --phylip --hwe --phylip-var --structure --fasta-samples-raw --fasta-samples --fasta-loci --vcf --plink --fstats") 
