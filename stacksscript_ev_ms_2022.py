@@ -2,7 +2,6 @@ import os
 import re
 
 #Demultiplexes using a barcode file and stores new files in pradout directory
-#MAKE SURE FILES HAVE .fastq not .fq#
 os.system("process_radtags -i fastq -o stacks/ -b ./sample_tables/pool1_3.csv -e ecoRI --renz_1 mspI -t 145 -r -c -q -p ./fastq/fastq1/");
 os.system("process_radtags -i fastq -o stacks/ -b ./sample_tables/pool2_3.csv -e ecoRI --renz_1 mspI -t 145 -r -c -q -p ./fastq/fastq2/");
 os.system("process_radtags -i fastq -o stacks/ -b ./sample_tables/pool3_3.csv -e ecoRI --renz_1 mspI -t 145 -r -c -q -p ./fastq/fastq3/");
