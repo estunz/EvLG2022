@@ -74,7 +74,7 @@ library(sf)
 evpres <- st_read("ev_pres_AK_layers/POINT.shp") #Worldclim shapefile
 
 #create a csv with worldclim data for each occurrence
-ev_wc_spatial <- extract(x = env, y = as(evpres, "Spatial"), df = TRUE ) #doesn't work on laptop
+ev_wc_spatial <- extract(x = env, y = as(evpres, "Spatial"), df = TRUE )
 write.csv(ev_wc_spatial, "ev_pres_AK_wc_all_occs_08262021.csv")
 
 library(psych)
